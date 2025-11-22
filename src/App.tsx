@@ -1,34 +1,12 @@
-import React, { useMemo, useState } from "react";
+import React, { useMemo, useState, useEffect } from "react";
 import "./App.css";
 
-type Player = "X" | "O";
-type Cell = Player | null;
-type Board = Cell[];
-
-const WIN_LINES: number[][] = [
-  [0, 1, 2],
-  [3, 4, 5],
-  [6, 7, 8],
-  [0, 3, 6],
-  [1, 4, 7],
-  [2, 5, 8],
-  [0, 4, 8],
-  [2, 4, 6],
-];
-
-function getWinner(board: Board): { winner: Player | null; line: number[] | null } {
-  for (const line of WIN_LINES) {
-    const [a, b, c] = line;
-    if (board[a] && board[a] === board[b] && board[a] === board[c]) {
-      return { winner: board[a], line };
-    }
-  }
-  return { winner: null, line: null };
-}
-
-function isDraw(board: Board) {
-  return board.every((c) => c !== null);
-}
+import { Board, Player } from "./core/types";
+import { getWinner, isDraw } from "./core/gameLogic";
+import { ScoreBoard } from "./components/ScoreBoard";
+import { BoardView } from "./components/Board";
+import { Status } from "./components/Status";
+import { Actions } from "./components/Actions";
 
 export default function App() {
   const [board, setBoard] = useState<Board>(Array(9).fill(null));
@@ -39,42 +17,35 @@ export default function App() {
   const { winner, line } = useMemo(() => getWinner(board), [board]);
   const draw = !winner && isDraw(board);
 
-  function handleClick(i: number) {
+  const handleClick = (i: number) => {
     if (board[i] || winner) return;
 
     setBoard((prev) => {
-      const next = prev.slice();
+      const next = [...prev];
       next[i] = current;
       return next;
     });
     setCurrent((p) => (p === "X" ? "O" : "X"));
-  }
+  };
 
-  function resetBoard(nextStarter: Player = current) {
-    setBoard(Array(9).fill(null));
-    setCurrent(nextStarter);
-    setRound((r) => r + 1);
-  }
-
-  function resetAll() {
-    setBoard(Array(9).fill(null));
-    setCurrent("X");
-    setScore({ X: 0, O: 0 });
-    setRound(1);
-  }
-
-  // когда появился победитель — обновим счёт один раз
-  React.useEffect(() => {
+  useEffect(() => {
     if (winner) {
       setScore((s) => ({ ...s, [winner]: s[winner] + 1 }));
     }
   }, [winner]);
 
-  const statusText = winner
-      ? `Победили ${winner} 🎉`
-      : draw
-          ? "Ничья 🤝"
-          : `Ход: ${current}`;
+  const resetRound = (starter: Player) => {
+    setBoard(Array(9).fill(null));
+    setCurrent(starter);
+    setRound((r) => r + 1);
+  };
+
+  const resetAll = () => {
+    setBoard(Array(9).fill(null));
+    setCurrent("X");
+    setScore({ X: 0, O: 0 });
+    setRound(1);
+  };
 
   return (
       <div className="page">
@@ -85,62 +56,23 @@ export default function App() {
               <p className="subtitle">Раунд #{round}</p>
             </div>
 
-            <div className="score">
-              <div className={`scoreItem ${current === "X" && !winner && !draw ? "active" : ""}`}>
-                <span className="badge x">X</span>
-                <span className="scoreNum">{score.X}</span>
-              </div>
-              <div className="divider" />
-              <div className={`scoreItem ${current === "O" && !winner && !draw ? "active" : ""}`}>
-                <span className="badge o">O</span>
-                <span className="scoreNum">{score.O}</span>
-              </div>
-            </div>
+            <ScoreBoard current={current} winner={winner} draw={draw} score={score} />
           </header>
 
-          <div className="status" aria-live="polite">
-            {statusText}
-          </div>
+          <Status winner={winner} draw={draw} current={current} />
 
-          <div className="board" role="grid" aria-label="Tic tac toe board">
-            {board.map((cell, i) => {
-              const isWinCell = line?.includes(i);
-              return (
-                  <button
-                      key={i}
-                      className={`cell ${cell ? "filled" : ""} ${isWinCell ? "win" : ""}`}
-                      onClick={() => handleClick(i)}
-                      role="gridcell"
-                      aria-label={`cell-${i + 1}`}
-                  >
-                <span className={`mark ${cell === "X" ? "x" : cell === "O" ? "o" : ""}`}>
-                  {cell ?? ""}
-                </span>
-                    <span className="cellGlow" />
-                  </button>
-              );
-            })}
-          </div>
+          <BoardView board={board} line={line} onClick={handleClick} />
 
-          <div className="actions">
-            {(winner || draw) ? (
-                <button className="btn primary" onClick={() => resetBoard(winner ? winner : current)}>
-                  Следующий раунд
-                </button>
-            ) : (
-                <button className="btn" onClick={() => resetBoard(current)}>
-                  Перезапуск раунда
-                </button>
-            )}
-            <button className="btn ghost" onClick={resetAll}>
-              Сбросить счёт
-            </button>
-          </div>
+          <Actions
+              winner={winner}
+              draw={draw}
+              current={current}
+              onResetRound={resetRound}
+              onResetAll={resetAll}
+          />
 
           <footer className="footer">
-          <span className="hint">
-            Кликни по клетке. Победа — 3 в ряд.
-          </span>
+            <span className="hint">Кликни по клетке. Победа — 3 в ряд.</span>
           </footer>
         </div>
       </div>
